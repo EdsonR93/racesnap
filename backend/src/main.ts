@@ -6,7 +6,7 @@ import { eventRoutes } from "./infrastructure/http/routes/events.routes";
 
 
 
-dotenv.config();
+dotenv.config({ path: process.env.ENV_FILE || ".env.dev" });
 
 async function bootstrap(){
     const app = express();

@@ -1,17 +1,97 @@
 services:
   api:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: racesnap-api
     ports:
       - "3000:3000"
-    environment:
-      - MONGO_URL=mongodb://mongo:27017
-      - MONGO_DB_NAME=racesnap
+    env_file:
+      - ./backend/.env.dev
     depends_on:
       - mongo
+      - kafka
+      - azurite
+    restart: unless-stopped
+    networks:
+      - racesnap-net
 
   mongo:
-    image: mongo
+    image: mongo:7
+    container_name: racesnap-mongo
     ports:
       - "27017:27017"
-  env_file:
-  - backend/.env.dev
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+    networks:
+      - racesnap-net
+
+  # Kafka (single-node, good for local dev)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: racesnap-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    restart: unless-stopped
+    networks:
+      - racesnap-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: racesnap-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      # Host access (your machine)
+      - "9092:9092"
+      # Optional: internal access debugging
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      # Two listeners:
+      # - PLAINTEXT://kafka:29092 for containers (api/worker)
+      # - PLAINTEXT_HOST://localhost:9092 for your host machine
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    restart: unless-stopped
+    networks:
+      - racesnap-net
+
+  # Azurite (Blob only for now)
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.31.0
+    container_name: racesnap-azurite
+    command: >
+      azurite-blob
+      --blobHost 0.0.0.0
+      --blobPort 10000
+      --location /data
+      --debug /data/debug.log
+    ports:
+      - "10000:10000"
+    volumes:
+      - azurite_data:/data
+    restart: unless-stopped
+    networks:
+      - racesnap-net
+
+volumes:
+  mongo_data:
+  azurite_data:
+
+networks:
+  racesnap-net:
+    driver: bridge
