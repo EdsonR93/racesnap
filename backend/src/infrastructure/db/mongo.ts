@@ -1,13 +1,22 @@
-import {MongoClient} from "mongodb";
+import { Db, MongoClient } from "mongodb";
 
-let db:any;
+let db: Db | null = null;
 
-export async function connectToMongo() {
-    const client = new MongoClient(process.env.MONGO_URL!);
-    await client.connect();
-    db = client.db(process.env.MONGO_DB_NAME);
-    console.log("Connected tp MongoDB");
-    
+export async function connectToMongo(): Promise<void> {
+  const url = process.env.MONGO_URL;
+  const dbName = process.env.MONGO_DB_NAME;
+
+  if (!url) throw new Error("MONGO_URL is not set");
+  if (!dbName) throw new Error("MONGO_DB_NAME is not set");
+
+  const client = new MongoClient(url);
+  await client.connect();
+  db = client.db(dbName);
+
+  console.log("Connected to MongoDB");
 }
 
-export const getDb = () => db;
+export function getDb(): Db {
+  if (!db) throw new Error("MongoDB not initialized. Call connectToMongo() first.");
+  return db;
+}
