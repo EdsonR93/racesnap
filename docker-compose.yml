@@ -21,6 +21,9 @@ services:
     container_name: racesnap-mongo
     ports:
       - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: devuser
+      MONGO_INITDB_ROOT_PASSWORD: d3vp4ssw0rd!
     volumes:
       - mongo_data:/data/db
     restart: unless-stopped

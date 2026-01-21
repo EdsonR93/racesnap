@@ -14,9 +14,20 @@ export async function connectToMongo(): Promise<void> {
   db = client.db(dbName);
 
   console.log("Connected to MongoDB");
+  ensureIndexes();
 }
 
 export function getDb(): Db {
   if (!db) throw new Error("MongoDB not initialized. Call connectToMongo() first.");
   return db;
+}
+
+export async function ensureIndexes(): Promise<void> {
+  const usersCollection = db?.collection('users');
+  try {
+    await usersCollection?.createIndex({email: 1}, {name: "userEmail"});
+    console.log("Indexes ensured.");
+  } catch(error) {
+    console.error("Failed to ensure indexes: ", error);
+  }
 }
